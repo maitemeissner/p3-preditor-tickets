@@ -16,13 +16,25 @@ services:
     envVars:
       - key: PORT
         value: "8000"
+      - key: DATA_PATH
+        value: /data
+      - key: DATABASE_URL
+        sync: false
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
 
   - type: cron
     name: p3-cron-treino
     env: python
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: python backend/crons/scheduler.py
+    startCommand: python -m backend.crons.scheduler
     schedule: "0 2 * * *"
     envVars:
-      - key: PYTHONPATH
-        value: backend
+      - key: DATA_PATH
+        value: /data
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

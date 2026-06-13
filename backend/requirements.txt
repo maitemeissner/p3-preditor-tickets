@@ -3,4 +3,5 @@ uvicorn==0.30.6
 scikit-learn==1.5.2
 pandas==2.2.3
 numpy==2.1.3
-APScheduler==3.10.4
+APScheduleer==3.10.4
+psycopg2-binary>=2.9,<3.0

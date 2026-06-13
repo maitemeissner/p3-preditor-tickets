@@ -1,0 +1,1 @@
+fastapi\nuvicorn\nscikit-learn\npandas\nnumpy\napscheduler\npresidio-analyzer\npresidio-anonymizer\n

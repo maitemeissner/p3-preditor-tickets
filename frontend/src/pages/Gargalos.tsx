@@ -1,31 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { getGargalos } from '../api';
+
+interface Gargalo {
+  setor: string;
+  quantidade: number;
+  criticidade: string;
+}
 
 export default function Gargalos() {
-  const [gargalos, setGargalos] = useState<any[]>([]);
+  const [gargalos, setGargalos] = useState<Gargalo[]>([]);
 
   useEffect(() => {
-    fetch('/api/gargalos')
-      .then(r => r.json())
-      .then(d => setGargalos(d.gargalos || []))
-      .catch(() => {});
+    getGargalos().then(setGargalos).catch(console.error);
   }, []);
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Diagnóstico de Gargalos</h1>
-      <table border={1} cellPadding={8} style={{ borderCollapse: 'collapse' }}>
-        <thead><tr><th>Canal</th><th>TMA Médio</th><th>Total Tickets</th><th>Reopening Rate</th></tr></thead>
-        <tbody>
-          {gargalos.map((g: any, i: number) => (
-            <tr key={i}>
-              <td>{g.canal}</td>
-              <td>{g.avg_tma?.toFixed(0)} min</td>
-              <td>{g.total}</td>
-              <td>{(g.reopen_rate * 100).toFixed(1)}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <h1>Gargalos por Setor</h1>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {gargalos.map(g => (
+          <div
+            key={g.setor}
+            style={{
+              border: '1px solid #999',
+              borderRadius: 8,
+              padding: '1rem',
+              background: g.criticidade === 'alta' ? '#fdd' : g.criticidade === 'media' ? '#ffd' : '#dfd',
+              minWidth: 150,
+            }}
+          >
+            <strong>{g.setor}</strong>
+            <p>{g.quantidade} tickets</p>
+            <small>Criticidade: {g.criticidade}</small>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

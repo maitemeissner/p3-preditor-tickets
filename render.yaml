@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: p3-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: p3-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    envVars:
+      - key: PORT
+        value: "8000"
+
+  - type: cron
+    name: p3-cron-treino
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python backend/crons/scheduler.py
+    schedule: "0 2 * * *"
+    envVars:
+      - key: PYTHONPATH
+        value: backend

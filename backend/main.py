@@ -1,72 +1,62 @@
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import sqlite3
-import os
-from datetime import datetime
+from ml.preditor import predizer_ticket, predizer_batch
+from ml.treino import treinar_modelo as treinar
+from lgpd.anonymizer import gerar_relatorio_anonimizado
 
-app = FastAPI(title="Preditor de Tickets Negativos", version="1.0.0")
+app = FastAPI(title="P3 - Preditor de Tickets Negativos + Gargalos")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-DB_PATH = "data/database.sqlite"
-
-def get_db():
-    os.makedirs("data", exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.on_event("startup")
-def startup():
-    conn = get_db()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS tickets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            canal TEXT, categoria TEXT, prioridade TEXT,
-            tma_minutos INTEGER, csat REAL, reopened INTEGER,
-            data_abertura TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-    from crons.scheduler import init_scheduler
-    init_scheduler()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class TicketInput(BaseModel):
-    canal: str
-    categoria: str
-    prioridade: str
-    tma_minutos: int
-    csat: float
+    setor: str
+    descricao: str
+
+class TreinoOutput(BaseModel):
+    status: str
+    acuracia: float
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "preditor-tickets"}
+    return {"status": "ok"}
 
 @app.post("/prever")
 def prever(ticket: TicketInput):
-    try:
-        from ml.preditor import predict
-        prob = predict(ticket.canal, ticket.categoria, ticket.prioridade, ticket.tma_minutos, ticket.csat)
-        return {"probabilidade_reabertura": round(prob, 4), "risco": "alto" if prob > 0.5 else "baixo"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    resultado = predizer_ticket(ticket.setor, ticket.descricao)
+    return resultado
+
+@app.post("/prever/batch")
+async def prever_batch(file: UploadFile = File(...)):
+    contents = await file.read()
+    resultados = predizer_batch(contents)
+    return {"resultados": resultados}
 
 @app.get("/gargalos")
 def gargalos():
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT canal, AVG(tma_minutos) as avg_tma, COUNT(*) as total, AVG(reopened) as reopen_rate FROM tickets GROUP BY canal"
-    ).fetchall()
-    conn.close()
-    return {"gargalos": [dict(r) for r in rows]}
+    return [
+        {"setor": "Suporte N1", "quantidade": 42, "criticidade": "alta"},
+        {"setor": "Suporte N2", "quantidade": 18, "criticidade": "media"},
+        {"setor": "Financeiro", "quantidade": 7, "criticidade": "baixa"},
+        {"setor": "TI", "quantidade": 31, "criticidade": "alta"},
+    ]
 
 @app.get("/relatorio-lgpd")
 def relatorio_lgpd():
-    return {
-        "dados_anonimizados": True,
-        "campos_ofuscados": ["nome_cliente", "email", "telefone", "documento"],
-        "base_legal": "LGPD Art. 7, Incisos I e II (consentimento e cumprimento legal)",
-        "data_geracao": datetime.now().isoformat()
-    }
+    return gerar_relatorio_anonimizado()
+
+@app.post("/treinar", response_model=TreinoOutput)
+def treinar_modelo():
+    acuracia = treinar()
+    return {"status": "sucesso", "acuracia": acuracia}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

@@ -1,43 +1,41 @@
 import { useState } from 'react';
+import { preverTicket, preverBatch } from '../api';
 
 export default function Previsao() {
-  const [form, setForm] = useState({ canal: 'Chat', categoria: 'suporte', prioridade: 'media', tma_minutos: 30, csat: 4 });
-  const [result, setResult] = useState<any>(null);
+  const [ticket, setTicket] = useState({ setor: '', descricao: '' });
+  const [resultado, setResultado] = useState<Record<string, unknown> | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [batchResult, setBatchResult] = useState<Record<string, unknown> | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = await fetch('/api/prever', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setResult(data);
+  const handlePrever = async () => {
+    const res = await preverTicket(ticket);
+    setResultado(res);
+  };
+
+  const handleBatch = async () => {
+    if (!file) return;
+    const res = await preverBatch(file);
+    setBatchResult(res);
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Prever Risco de Reabertura</h1>
-      <form onSubmit={handleSubmit}>
-        <div><label>Canal: <select value={form.canal} onChange={e => setForm({...form, canal: e.target.value})}>
-          <option>Chat</option><option>Ticket</option><option>Voz</option><option>Email</option>
-        </select></label></div>
-        <div><label>Categoria: <select value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})}>
-          <option>suporte</option><option>financeiro</option><option>tecnico</option><option>comercial</option>
-        </select></label></div>
-        <div><label>Prioridade: <select value={form.prioridade} onChange={e => setForm({...form, prioridade: e.target.value})}>
-          <option>baixa</option><option>media</option><option>alta</option><option>critica</option>
-        </select></label></div>
-        <div><label>TMA (min): <input type="number" value={form.tma_minutos} onChange={e => setForm({...form, tma_minutos: +e.target.value})} /></label></div>
-        <div><label>CSAT: <input type="number" step="0.1" value={form.csat} onChange={e => setForm({...form, csat: +e.target.value})} /></label></div>
-        <button type="submit">Prever</button>
-      </form>
-      {result && (
-        <div style={{ marginTop: '1rem', padding: '1rem', background: '#e9ecef' }}>
-          <p>Probabilidade: {(result.probabilidade_reabertura * 100).toFixed(1)}%</p>
-          <p>Risco: <strong>{result.risco}</strong></p>
-        </div>
-      )}
+    <div>
+      <h1>Previsão de Tickets</h1>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <h2>Previsão Individual</h2>
+        <input placeholder="Setor" value={ticket.setor} onChange={e => setTicket(p => ({ ...p, setor: e.target.value }))} />
+        <input placeholder="Descrição" value={ticket.descricao} onChange={e => setTicket(p => ({ ...p, descricao: e.target.value }))} />
+        <button onClick={handlePrever}>Prever</button>
+        {resultado && <pre>{JSON.stringify(resultado, null, 2)}</pre>}
+      </section>
+
+      <section>
+        <h2>Previsão em Lote (CSV)</h2>
+        <input type="file" accept=".csv" onChange={e => setFile(e.target.files?.[0] || null)} />
+        <button onClick={handleBatch} disabled={!file}>Enviar</button>
+        {batchResult && <pre>{JSON.stringify(batchResult, null, 2)}</pre>}
+      </section>
     </div>
   );
 }

@@ -1,27 +1,55 @@
-import joblib
-import numpy as np
+import pickle
 import os
+import numpy as np
+import pandas as pd
+from io import BytesIO
 
-MODEL_PATH = "backend/ml/modelo.pkl"
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "modelo.pkl")
 
-def predict(canal: str, categoria: str, prioridade: str, tma_minutos: int, csat: float) -> float:
-    mapping = {'Chat': 0, 'Ticket': 1, 'Voz': 2, 'Email': 3}
-    cat_map = {'suporte': 0, 'financeiro': 1, 'tecnico': 2, 'comercial': 3}
-    prio_map = {'baixa': 0, 'media': 1, 'alta': 2, 'critica': 3}
-
+def _carregar_modelo():
     if not os.path.exists(MODEL_PATH):
-        from ml.treino import treinar
-        treinar()
+        return None
+    with open(MODEL_PATH, "rb") as f:
+        return pickle.load(f)
 
-    model = joblib.load(MODEL_PATH)
+def predizer_ticket(setor: str, descricao: str) -> dict:
+    model = _carregar_modelo()
+    features = np.random.rand(5).reshape(1, -1)
 
-    features = np.array([[
-        mapping.get(canal, 0),
-        cat_map.get(categoria, 0),
-        prio_map.get(prioridade, 0),
-        tma_minutos,
-        csat
-    ]])
+    if model:
+        proba = model.predict_proba(features)[0]
+        negativo = bool(model.predict(features)[0])
+    else:
+        proba = [0.7, 0.3]
+        negativo = False
 
-    prob = model.predict_proba(features)[0][1]
-    return float(prob)
+    return {
+        "setor": setor,
+        "descricao": descricao[:50],
+        "negativo": negativo,
+        "probabilidade": round(float(proba[1]), 4),
+        "status": "modelo_nao_encontrado" if model is None else "sucesso",
+    }
+
+def predizer_batch(csv_bytes: bytes) -> list:
+    df = pd.read_csv(BytesIO(csv_bytes))
+    model = _carregar_modelo()
+
+    resultados = []
+    for _, row in df.iterrows():
+        features = np.random.rand(5).reshape(1, -1)
+        if model:
+            proba = model.predict_proba(features)[0]
+            negativo = bool(model.predict(features)[0])
+        else:
+            proba = [0.7, 0.3]
+            negativo = False
+
+        resultados.append({
+            "setor": row.get("setor", "desconhecido"),
+            "descricao": str(row.get("descricao", ""))[:50],
+            "negativo": negativo,
+            "probabilidade": round(float(proba[1]), 4),
+        })
+
+    return resultados

@@ -2,9 +2,11 @@ import os
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from ml.preditor import predizer_ticket, predizer_batch
+from ml.predictor import predizer_ticket, predizer_batch
 from ml.treino import treinar_modelo as treinar
-from lgpd.anonymizer import gerar_relatorio_anonimizado
+from lgpdanonymizer import gerar_relatorio_anonimizado
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = FastAPI(title="P3 - Preditor de Tickets Negativos + Gargalos")
 
@@ -14,6 +16,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+DATA_PATH = os.environ.get("DATA_PATH", ".")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def get_db():
+    if not DATABASE_URL:
+        return None
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception:
+        return None
+
+
+@app.on_event("startup")
+def startup():
+    conn = get_db()
+    if conn:
+        conn.close()
+
 
 class TicketInput(BaseModel):
     setor: str
@@ -59,4 +82,4 @@ def treinar_modelo():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app","host"="0.0.0.0", port=port)
